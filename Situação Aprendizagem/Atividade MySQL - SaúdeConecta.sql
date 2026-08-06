@@ -123,6 +123,30 @@ CREATE TABLE exams_result (
 		UNIQUE (exam_id)
 );
 
+CREATE TABLE auditoriums (
+	auditorium_id INT AUTO_INCREMENT PRIMARY KEY,
+    consultation_id INT,
+    auditorium_note TEXT NOT NULL,
+    register_date DATETIME DEFAULT (CURRENT_TIMESTAMP()) NOT NULL,
+    responsible_person VARCHAR(60) NOT NULL,
+    
+	CONSTRAINT fk_auditoriums_consultations
+		FOREIGN KEY (consultation_id) REFERENCES consultations (consultation_id),
+	CONSTRAINT uk_aditoriums_consultation_id
+		UNIQUE (consultation_id)
+);
+
+CREATE TABLE auditoriums_log (
+	log_id INT AUTO_INCREMENT PRIMARY KEY,
+    auditorium_id INT NOT NULL,
+    old_auditorium_note TEXT NOT NULL,
+    update_date DATETIME DEFAULT (CURRENT_TIMESTAMP()) NOT NULL,
+    responsible_person VARCHAR(60) NOT NULL,
+    
+    CONSTRAINT fk_auditoriums_log_auditoriums
+		FOREIGN KEY (auditorium_id) REFERENCES auditoriums (auditorium_id)
+);
+
 USE saude_conecta;
 
 -- Insert foi gerado com IA --
@@ -281,3 +305,73 @@ FROM consultations c
 RIGHT JOIN doctors d
 	ON d.doctor_id = c.doctor_id
 GROUP BY d.doctor_id, d.first_name, d.last_name;
+
+-- View --
+CREATE VIEW vw_historico_paciente AS
+SELECT p.patient_id AS 'ID do Paciente',
+	CONCAT(p.first_name, ' ', p.last_name) AS 'Nome',
+    p.legal_code AS 'Código Legal',
+    c.consultation_id AS 'ID da Consulta',
+    c.consultation_type AS 'Tipo de Consulta',
+    d.doctor_specialty AS 'Especialidade',
+    CONCAT(d.first_name, ' ', d.last_name) AS 'Profissional Responsável',
+    c.consultation_date AS 'Data do atendimento',
+    e.exam_id AS 'ID do Exame',
+    er.exam_result AS 'Resultado do Exame'
+FROM consultations c
+INNER JOIN patients p
+	ON p.patient_id = c.patient_id
+INNER JOIN doctors d
+	ON d.doctor_id = c.doctor_id
+INNER JOIN exams e
+	ON e.consultation_id = c.consultation_id
+INNER JOIN exams_result er
+	ON er.exam_id = e.exam_id
+WHERE c.current_status = 'Realizada'
+ORDER BY p.patient_id ASC;
+
+-- Comando para chamar o view --
+SELECT * FROM vw_historico_paciente;
+
+-- Trigger --
+DELIMITER //
+CREATE TRIGGER trg_auditoriums_recovery
+AFTER UPDATE
+ON auditoriums
+FOR EACH ROW
+BEGIN
+	IF NOT (OLD.auditorium_note <=> NEW.auditorium_note) THEN
+		INSERT INTO auditoriums_log (auditorium_id, old_auditorium_note, responsible_person) VALUES
+		(NEW.auditorium_id, OLD.auditorium_note, NEW.responsible_person);
+	END IF;
+END //
+DELIMITER ;
+
+-- Criação do Usuário --
+CREATE USER 'usuario_gestor'@'localhost' IDENTIFIED BY 'password123';
+GRANT SELECT ON saude_conecta.vw_historico_paciente TO 'usuario_gestor'@'localhost';
+
+-- Usando o Start Transaction --
+DELIMITER //
+CREATE PROCEDURE sp_update_consultation_price (
+	IN p_consultation_id INT,
+    IN p_new_consultation_price DECIMAL(10, 2)
+)
+BEGIN
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+		ROLLBACK;
+        SELECT 'Comando cancelado. Algum erro aconteceu.' AS 'Mensagem de Erro';
+	END;
+    UPDATE consultations
+    SET
+		consultation_price = p_new_consultation_price
+	WHERE consultation_id = p_consultation_id;
+    
+    COMMIT;
+END //
+DELIMITER ;
+-- Chamar a procedure --
+CALL sp_update_consultation_price(1, null);
+SELECT * FROM consultations
+WHERE consultation_id = 1;
