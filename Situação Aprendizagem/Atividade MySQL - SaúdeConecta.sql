@@ -28,7 +28,7 @@ CREATE TABLE patients_address (
     
     CONSTRAINT fk_patients_address_patients
 		FOREIGN KEY (patient_id) REFERENCES patients (patient_id)
-        ON DELETE RESTRICT
+        ON DELETE CASCADE
 );
 
 CREATE TABLE doctors (
@@ -59,7 +59,7 @@ CREATE TABLE doctors_address (
     
     CONSTRAINT fk_doctors_address_doctors
 		FOREIGN KEY (doctor_id) REFERENCES doctors (doctor_id)
-        ON DELETE RESTRICT
+        ON DELETE CASCADE
 );
 
 CREATE TABLE consultations (
@@ -373,5 +373,3 @@ END //
 DELIMITER ;
 -- Chamar a procedure --
 CALL sp_update_consultation_price(1, null);
-SELECT * FROM consultations
-WHERE consultation_id = 1;
