@@ -34,3 +34,17 @@ FROM Customers C
 WHERE Country = (SELECT Country FROM Suppliers WHERE SupplierID = 1);
 
 -- Atividade 5 --
+SELECT ProductID AS 'ID do Produto',
+	ProductName AS 'Nome do Produto',
+    (Price * 10) AS 'Preço do Estoque Inteiro'
+FROM Products
+WHERE (Price * 10) < (SELECT MAX(Price) FROM Products)
+LIMIT 12;
+
+-- Atividade 6 --
+SELECT C1.CustomerID AS 'ID do Cliente',
+	C1.CustomerName AS 'Nome do Cliente',
+    CONCAT('Última compra em: ', 
+    (SELECT MAX(O2.OrderDate) FROM Orders O2 WHERE O2.CustomerID = C1.CustomerID)) AS 'Última Compra'
+FROM Customers C1
+LIMIT 8;
